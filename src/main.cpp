@@ -125,27 +125,19 @@ void leftMotor(int speed) {
   if (speed > 0) {
     ledcWrite(pwmChannelLeft1, speed);
     ledcWrite(pwmChannelLeft2, 0);
-    ledcWrite(pwmChannelRight1, 0);
-    ledcWrite(pwmChannelRight2, speed);
   } else {
     ledcWrite(pwmChannelLeft1, 0);
     ledcWrite(pwmChannelLeft2, speed * -1);
-    ledcWrite(pwmChannelRight1, speed * -1);
-    ledcWrite(pwmChannelRight2, 0);
   }
 }
 
 void rightMotor(int speed) {
   if (speed > 0) {
-    ledcWrite(pwmChannelLeft1, 0);
-    ledcWrite(pwmChannelLeft2, speed);
-    ledcWrite(pwmChannelRight1, speed);
-    ledcWrite(pwmChannelRight2, 0);
-  } else {
-    ledcWrite(pwmChannelLeft1, speed * -1);
-    ledcWrite(pwmChannelLeft2, 0);
     ledcWrite(pwmChannelRight1, 0);
-    ledcWrite(pwmChannelRight2, speed * -1);
+    ledcWrite(pwmChannelRight2, speed);
+  } else {
+    ledcWrite(pwmChannelRight1, speed * -1);
+    ledcWrite(pwmChannelRight2, 0);
   }
 }
 
@@ -153,37 +145,42 @@ void handleUDP() {
   int packetSize = udp.parsePacket();
 
   if (packetSize) {
-    // buffer to hold incoming packet,
+    // Buffer to hold incoming packet
     char packetBuffer[255];
     udp.read(packetBuffer, 255);
     String data = String(packetBuffer);
+    data.trim(); // Trim any whitespace or newline characters
     Serial.print("Received packet: ");
     Serial.println(data);
 
-    // Parse data to extract motor control values, e.g., "L150,R200" and
-    // "L-100,R-100"
-    int commaIndex = data.indexOf(',');
-    if (commaIndex == -1) {
+    if (data[0] == 'S') {
+      stop();
       return;
     }
 
-    int leftSpeed = data.substring(1, commaIndex).toInt();
-    int rightSpeed = data.substring(commaIndex + 2).toInt();
+    int commaIndex = data.indexOf(',');
+    int leftSpeed = 0;
+    int rightSpeed = 0;
 
-    // Control motors based on extracted values
-    switch (data[0]) {
-    case 'S':
-      stop();
-      break;
-    case 'L':
+    // Parse left and right speeds from data
+    if (commaIndex != -1) {
+      // Command contains speeds for both motors
+      String leftPart = data.substring(1, commaIndex);
+      String rightPart = data.substring(commaIndex + 2);
+      leftSpeed = leftPart.toInt();
+      rightSpeed = rightPart.toInt();
+
       leftMotor(leftSpeed);
-      break;
-    case 'R':
       rightMotor(rightSpeed);
-      break;
-    default:
-      stop();
-      break;
+    } else {
+      // Command contains speed for one motor
+      if (data[0] == 'L') {
+        leftSpeed = data.substring(1).toInt();
+        leftMotor(leftSpeed);
+      } else if (data[0] == 'R') {
+        rightSpeed = data.substring(1).toInt();
+        rightMotor(rightSpeed);
+      }
     }
   }
 }
