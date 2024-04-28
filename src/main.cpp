@@ -5,6 +5,11 @@
 #include <WiFi.h>
 #include <WiFiUDP.h>
 
+// LEDs
+const int ledPin = 22; // Built-in LED on ESP32
+bool blinkLed = false;
+unsigned long lastBlinkTime = 0;
+
 // Motor control pins and PWM channels
 const int motorLeftPin1 = 13;  // INT1 on the L298N for left motor
 const int motorLeftPin2 = 15;  // INT2 on the L298N for left motor
@@ -31,6 +36,9 @@ void setupWiFi() {
   Serial.println("\nConnected to WiFi.");
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
+
+  // turn on LED on successful connection
+  digitalWrite(ledPin, LOW);
 }
 
 void setupOTA() {
@@ -81,6 +89,8 @@ void setupUDP() {
 void setup() {
   Serial.begin(115200);
 
+  pinMode(ledPin, OUTPUT);
+
   setupWiFi();
   setupOTA();
   setupUDP();
@@ -119,6 +129,7 @@ void stop() {
   ledcWrite(pwmChannelLeft2, 0);
   ledcWrite(pwmChannelRight1, 0);
   ledcWrite(pwmChannelRight2, 0);
+  blinkLed = false;
 }
 
 void leftMotor(int speed) {
@@ -129,6 +140,8 @@ void leftMotor(int speed) {
     ledcWrite(pwmChannelLeft1, 0);
     ledcWrite(pwmChannelLeft2, speed * -1);
   }
+
+  blinkLed = speed != 0;
 }
 
 void rightMotor(int speed) {
@@ -139,6 +152,8 @@ void rightMotor(int speed) {
     ledcWrite(pwmChannelRight1, speed * -1);
     ledcWrite(pwmChannelRight2, 0);
   }
+
+  blinkLed = speed != 0;
 }
 
 void handleUDP() {
@@ -188,7 +203,20 @@ void handleUDP() {
   }
 }
 
+void handleBlink() {
+  if (blinkLed) {
+    unsigned long currentTime = millis();
+    if (currentTime - lastBlinkTime >= 500) {
+      lastBlinkTime = currentTime;
+      digitalWrite(ledPin, !digitalRead(ledPin));
+    }
+  } else {
+    digitalWrite(ledPin, LOW);
+  }
+}
+
 void loop() {
   ArduinoOTA.handle();
   handleUDP();
+  handleBlink();
 }
