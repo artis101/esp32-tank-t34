@@ -180,6 +180,9 @@ void handleUDP() {
       } else if (data[0] == 'R') {
         rightSpeed = data.substring(1).toInt();
         rightMotor(rightSpeed);
+      } else {
+        Serial.println("Invalid command");
+        stop();
       }
     }
   }
