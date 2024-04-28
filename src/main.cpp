@@ -2,10 +2,8 @@
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <ESPmDNS.h>
-#include <WebServer.h>
 #include <WiFi.h>
-
-// WebServer server(80);
+#include <WiFiUDP.h>
 
 // Motor control pins and PWM channels
 const int motorLeftPin1 = 13;  // INT1 on the L298N for left motor
@@ -21,18 +19,21 @@ const int pwmChannelRight1 = 2; // PWM channel for motorRightPin1
 const int pwmChannelRight2 = 3; // PWM channel for motorRightPin2
 const int resolution = 8; // Resolution in bits (1-16), 8-bit gives 0-255 range
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println("Booting");
-  WiFi.mode(WIFI_STA);
+WiFiUDP udp;
+const int udpPort = 4210; // UDP port to listen on
+
+void setupWiFi() {
   WiFi.begin(ssid, password);
-
-  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-    Serial.println("Connection Failed! Rebooting...");
-    delay(5000);
-    ESP.restart();
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
   }
+  Serial.println("\nConnected to WiFi.");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+}
 
+void setupOTA() {
   ArduinoOTA.setHostname("tank-t34-esp32");
   // ArduinoOTA.setPassword("tankpassword");
 
@@ -69,6 +70,20 @@ void setup() {
       });
 
   ArduinoOTA.begin();
+}
+
+void setupUDP() {
+  udp.begin(udpPort);
+  Serial.print("UDP Server started on port ");
+  Serial.println(udpPort);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  setupWiFi();
+  setupOTA();
+  setupUDP();
 
   Serial.println("Ready");
   Serial.print("IP address: ");
@@ -99,78 +114,81 @@ void setup() {
   ledcWrite(pwmChannelRight2, 0);
 }
 
-// void testMotors() {
-//   // Left motor forward
-//   ledcWrite(pwmChannelLeft1, 255); // Speed control
-//   ledcWrite(pwmChannelLeft2, 0);
+void stop() {
+  ledcWrite(pwmChannelLeft1, 0);
+  ledcWrite(pwmChannelLeft2, 0);
+  ledcWrite(pwmChannelRight1, 0);
+  ledcWrite(pwmChannelRight2, 0);
+}
 
-//   // Right motor forward
-//   ledcWrite(pwmChannelRight1, 0); // Speed control
-//   ledcWrite(pwmChannelRight2, 255);
+void leftMotor(int speed) {
+  if (speed > 0) {
+    ledcWrite(pwmChannelLeft1, speed);
+    ledcWrite(pwmChannelLeft2, 0);
+    ledcWrite(pwmChannelRight1, 0);
+    ledcWrite(pwmChannelRight2, speed);
+  } else {
+    ledcWrite(pwmChannelLeft1, 0);
+    ledcWrite(pwmChannelLeft2, speed * -1);
+    ledcWrite(pwmChannelRight1, speed * -1);
+    ledcWrite(pwmChannelRight2, 0);
+  }
+}
 
-//   delay(2000); // Run motors forward for 2 seconds
+void rightMotor(int speed) {
+  if (speed > 0) {
+    ledcWrite(pwmChannelLeft1, 0);
+    ledcWrite(pwmChannelLeft2, speed);
+    ledcWrite(pwmChannelRight1, speed);
+    ledcWrite(pwmChannelRight2, 0);
+  } else {
+    ledcWrite(pwmChannelLeft1, speed * -1);
+    ledcWrite(pwmChannelLeft2, 0);
+    ledcWrite(pwmChannelRight1, 0);
+    ledcWrite(pwmChannelRight2, speed * -1);
+  }
+}
 
-//   // Stop all motors
-//   ledcWrite(pwmChannelLeft1, 0);
-//   ledcWrite(pwmChannelLeft2, 0);
-//   ledcWrite(pwmChannelRight1, 0);
-//   ledcWrite(pwmChannelRight2, 0);
+void handleUDP() {
+  int packetSize = udp.parsePacket();
 
-//   delay(1000); // Stop motors for 1 second
+  if (packetSize) {
+    // buffer to hold incoming packet,
+    char packetBuffer[255];
+    udp.read(packetBuffer, 255);
+    String data = String(packetBuffer);
+    Serial.print("Received packet: ");
+    Serial.println(data);
 
-//   // Left motor backward
-//   ledcWrite(pwmChannelLeft1, 0); // Speed control
-//   ledcWrite(pwmChannelLeft2, 180);
+    // Parse data to extract motor control values, e.g., "L150,R200" and
+    // "L-100,R-100"
+    int commaIndex = data.indexOf(',');
+    if (commaIndex == -1) {
+      return;
+    }
 
-//   // Right motor forward
-//   ledcWrite(pwmChannelRight1, 0); // Speed control
-//   ledcWrite(pwmChannelRight2, 180);
+    int leftSpeed = data.substring(1, commaIndex).toInt();
+    int rightSpeed = data.substring(commaIndex + 2).toInt();
 
-//   delay(1000); // Run motors forward for 2 seconds
+    // Control motors based on extracted values
+    switch (data[0]) {
+    case 'S':
+      stop();
+      break;
+    case 'L':
+      leftMotor(leftSpeed);
+      break;
+    case 'R':
+      rightMotor(rightSpeed);
+      break;
+    default:
+      stop();
+      break;
+    }
+  }
+}
 
-//   // Stop all motors
-//   ledcWrite(pwmChannelLeft1, 0);
-//   ledcWrite(pwmChannelLeft2, 0);
-//   ledcWrite(pwmChannelRight1, 0);
-//   ledcWrite(pwmChannelRight2, 0);
-
-//   delay(1000); // Stop motors for 1 second
-
-//   // Left motor forward
-//   ledcWrite(pwmChannelLeft1, 180); // Speed control
-//   ledcWrite(pwmChannelLeft2, 0);
-
-//   // Right motor backward
-//   ledcWrite(pwmChannelRight1, 180); // Speed control
-//   ledcWrite(pwmChannelRight2, 0);
-
-//   delay(1000); // Run motors forward for 2 seconds
-
-//   // Stop all motors
-//   ledcWrite(pwmChannelLeft1, 0);
-//   ledcWrite(pwmChannelLeft2, 0);
-//   ledcWrite(pwmChannelRight1, 0);
-//   ledcWrite(pwmChannelRight2, 0);
-
-//   delay(1000); // Stop motors for 1 second
-
-//   // Left motor backward
-//   ledcWrite(pwmChannelLeft1, 0); // Speed control
-//   ledcWrite(pwmChannelLeft2, 200);
-
-//   // Right motor backward
-//   ledcWrite(pwmChannelRight1, 200); // Speed control
-//   ledcWrite(pwmChannelRight2, 0);
-
-//   delay(2000); // Run motors backward for 2 seconds
-
-//   // Stop all motors
-//   ledcWrite(pwmChannelLeft1, 0);
-//   ledcWrite(pwmChannelLeft2, 0);
-//   ledcWrite(pwmChannelRight1, 0);
-//   ledcWrite(pwmChannelRight2, 0);
-
-//   delay(1000); // Stop motors for 1 second
-// }
-
-void loop() { ArduinoOTA.handle(); }
+void loop() {
+  ArduinoOTA.handle();
+  handleUDP();
+}
