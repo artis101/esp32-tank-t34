@@ -1,10 +1,11 @@
+#include "secrets.h"
 #include <Arduino.h>
 #include <ArduinoOTA.h>
 #include <ESPmDNS.h>
+#include <WebServer.h>
 #include <WiFi.h>
 
-const char *ssid = "Interneti";
-const char *password = "liesagovs";
+// WebServer server(80);
 
 // Motor control pins and PWM channels
 const int motorLeftPin1 = 13;  // INT1 on the L298N for left motor
