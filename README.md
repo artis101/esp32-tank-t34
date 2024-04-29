@@ -19,6 +19,14 @@ Todo list:
 ## Hardware
 
 - ESP-32 Lite REV1 CH340G with USB-C and battery charging circuit built-in
+  - PIN 13 and 15 INT3 and INT4 are used for the motor driver B motor
+  - PIN 16 and 17 INT1 and INT2 are used for the motor driver A motor
+  - PIN 0, 2 and 4 are used for the LED bar by pulling them low
+  - PIN 26 and 33 are for turret motor INT1 and INT2
+  - PIN 32, 33, 34 and 35 are for turret sensors/LED's
+    - 34 is turret side translucent LED
+    - 35 is turret barrel LED
+    - 32 and 33 are turret IR sensor and IR LED?
 - L298N Lite motor driver with no heat sink and enable pin
 - 1x T-34 tank toy
 - 2x original DC toy motors from the tank toy
@@ -34,6 +42,43 @@ Todo list:
 - Python REPL client for testing
 
 ## Plans
+
+### Line following mode
+
+A friend and coworker of mine gifted me a line following robot advent calendar. I really enjoyed building it and freshened up my knowledge on how an H-bridge works and how to control robots with simple feedback loops.
+
+I plan to add a line following mode to the robot. I will use the IR receiver and IR transmitter from the advent calendar to detect the line and follow it. I'm thinking of using proportional control for it:
+
+```cpp
+void followLine() {
+  int leftValue = analogRead(sensorLeftPin); // Left IR LED
+  int rightValue = analogRead(sensorRightPin);
+
+  int leftSpeed = 180;  // Minimum speed
+  int rightSpeed = 180; // Minimum speed
+
+  // Calculate deviation
+  int deviation = leftValue - rightValue;
+
+  // Proportional Gain; I need to tune this value, start with a small number
+  float Kp = 0.1;
+
+  // Calculate speed adjustment
+  int adjustment = Kp * deviation;
+
+  // Adjust motor speeds based on deviation
+  leftSpeed += adjustment;
+  rightSpeed -= adjustment;
+
+  // Ensure speeds stay within the 180 to 255 range
+  leftSpeed = constrain(leftSpeed, 180, 255);
+  rightSpeed = constrain(rightSpeed, 180, 255);
+
+  // Update motor speeds
+  leftMotor(leftSpeed);
+  rightMotor(rightSpeed);
+}
+```
 
 ### Adding a camera
 

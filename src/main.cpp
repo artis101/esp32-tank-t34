@@ -10,18 +10,29 @@ const int ledPin = 22; // Built-in LED on ESP32
 bool blinkLed = false;
 unsigned long lastBlinkTime = 0;
 
+// Status bar LED's
+const int statusBarLed1 = 2;
+const int statusBarLed2 = 0;
+const int statusBarLed3 = 4;
+
 // Motor control pins and PWM channels
 const int motorLeftPin1 = 13;  // INT1 on the L298N for left motor
 const int motorLeftPin2 = 15;  // INT2 on the L298N for left motor
 const int motorRightPin1 = 16; // INT3 on the L298N for right motor
 const int motorRightPin2 = 17; // INT4 on the L298N for right motor
 
+// Turret motor control pins
+const int turretMotorPin1 = 25; // INT1 on the second L298N for turret motor
+const int turretMotorPin2 = 26; // INT2 on the second L298N for turret motor
+
 // PWM parameters
-const int freq = 5000;          // Frequency in Hz
-const int pwmChannelLeft1 = 0;  // PWM channel for motorLeftPin1
-const int pwmChannelLeft2 = 1;  // PWM channel for motorLeftPin2
-const int pwmChannelRight1 = 2; // PWM channel for motorRightPin1
-const int pwmChannelRight2 = 3; // PWM channel for motorRightPin2
+const int freq = 5000;           // Frequency in Hz
+const int pwmChannelLeft1 = 0;   // PWM channel for motorLeftPin1
+const int pwmChannelLeft2 = 1;   // PWM channel for motorLeftPin2
+const int pwmChannelRight1 = 2;  // PWM channel for motorRightPin1
+const int pwmChannelRight2 = 3;  // PWM channel for motorRightPin2
+const int pwmChannelTurret1 = 4; // PWM channel for turretMotorPin1
+const int pwmChannelTurret2 = 5; // PWM channel for turretMotorPin2
 const int resolution = 8; // Resolution in bits (1-16), 8-bit gives 0-255 range
 
 WiFiUDP udp;
@@ -99,29 +110,47 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
+  // Initialize status bar LEDs
+  pinMode(statusBarLed1, OUTPUT);
+  pinMode(statusBarLed2, OUTPUT);
+  pinMode(statusBarLed3, OUTPUT);
+
+  // turn off status bar LEDs initially
+  digitalWrite(statusBarLed1, HIGH);
+  digitalWrite(statusBarLed2, HIGH);
+  digitalWrite(statusBarLed3, HIGH);
+
   // Initialize motor control pins as outputs
   pinMode(motorLeftPin1, OUTPUT);
   pinMode(motorLeftPin2, OUTPUT);
   pinMode(motorRightPin1, OUTPUT);
   pinMode(motorRightPin2, OUTPUT);
+  pinMode(turretMotorPin1, OUTPUT);
+  pinMode(turretMotorPin2, OUTPUT);
 
   // Setup PWM channels
   ledcSetup(pwmChannelLeft1, freq, resolution);
   ledcSetup(pwmChannelLeft2, freq, resolution);
   ledcSetup(pwmChannelRight1, freq, resolution);
   ledcSetup(pwmChannelRight2, freq, resolution);
+  ledcSetup(pwmChannelTurret1, freq, resolution);
+  ledcSetup(pwmChannelTurret2, freq, resolution);
 
   // Attach PWM channels to the pins
   ledcAttachPin(motorLeftPin1, pwmChannelLeft1);
   ledcAttachPin(motorLeftPin2, pwmChannelLeft2);
   ledcAttachPin(motorRightPin1, pwmChannelRight1);
   ledcAttachPin(motorRightPin2, pwmChannelRight2);
+  ledcAttachPin(turretMotorPin1, pwmChannelTurret1);
+  ledcAttachPin(turretMotorPin2, pwmChannelTurret2);
 
   // Stop all motors
   ledcWrite(pwmChannelLeft1, 0);
   ledcWrite(pwmChannelLeft2, 0);
   ledcWrite(pwmChannelRight1, 0);
   ledcWrite(pwmChannelRight2, 0);
+  ledcWrite(pwmChannelTurret1, 0);
+  ledcWrite(pwmChannelTurret2, 0);
 }
 
 void stop() {
@@ -129,6 +158,8 @@ void stop() {
   ledcWrite(pwmChannelLeft2, 0);
   ledcWrite(pwmChannelRight1, 0);
   ledcWrite(pwmChannelRight2, 0);
+  ledcWrite(pwmChannelTurret1, 0);
+  ledcWrite(pwmChannelTurret2, 0);
   blinkLed = false;
 }
 
@@ -151,6 +182,18 @@ void rightMotor(int speed) {
   } else {
     ledcWrite(pwmChannelRight1, speed * -1);
     ledcWrite(pwmChannelRight2, 0);
+  }
+
+  blinkLed = speed != 0;
+}
+
+void turretMotor(int speed) {
+  if (speed > 0) {
+    ledcWrite(pwmChannelTurret1, 0);
+    ledcWrite(pwmChannelTurret2, speed);
+  } else {
+    ledcWrite(pwmChannelTurret1, speed * -1);
+    ledcWrite(pwmChannelTurret2, 0);
   }
 
   blinkLed = speed != 0;
@@ -195,6 +238,9 @@ void handleUDP() {
       } else if (data[0] == 'R') {
         rightSpeed = data.substring(1).toInt();
         rightMotor(rightSpeed);
+      } else if (data[0] == 'T') {
+        int turretSpeed = data.substring(1).toInt();
+        turretMotor(turretSpeed);
       } else {
         Serial.println("Invalid command");
         stop();
@@ -209,9 +255,17 @@ void handleBlink() {
     if (currentTime - lastBlinkTime >= 500) {
       lastBlinkTime = currentTime;
       digitalWrite(ledPin, !digitalRead(ledPin));
+
+      // Toggle status bar LEDs
+      digitalWrite(statusBarLed1, !digitalRead(statusBarLed1));
+      digitalWrite(statusBarLed2, !digitalRead(statusBarLed2));
+      digitalWrite(statusBarLed3, !digitalRead(statusBarLed3));
     }
   } else {
     digitalWrite(ledPin, LOW);
+    digitalWrite(statusBarLed1, HIGH);
+    digitalWrite(statusBarLed2, HIGH);
+    digitalWrite(statusBarLed3, HIGH);
   }
 }
 
