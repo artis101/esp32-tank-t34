@@ -52,11 +52,16 @@ def validate_part(part):
     if not part:
         return False
     action = part[0].upper()
-    if action not in ["L", "R", "T"] and not (action == "S" and len(part) == 1):
+
+    KNOWN_ACTIONS = ["L", "R", "T", "S", "F"]
+    KNOWN_SINGLE_LETTER_ACTIONS = ["S", "F"]
+    KNOWN_NUMERIC_ACTIONS = ["L", "R", "T"]
+
+    if action not in KNOWN_ACTIONS:
         return False
-    if action == "S":
-        return len(part) == 1  # 'S' must be alone
-    if action in ["L", "R", "T"]:
+    if action in KNOWN_SINGLE_LETTER_ACTIONS:
+        return len(part) == 1  # Single letter actions must be alone
+    if action in KNOWN_NUMERIC_ACTIONS:
         speed = part[1:]
         if speed.isdigit() or (speed.startswith("-") and speed[1:].isdigit()):
             return True  # Speed is a valid integer, positive or negative

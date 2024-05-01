@@ -15,6 +15,9 @@ const int statusBarLed1 = 2;
 const int statusBarLed2 = 0;
 const int statusBarLed3 = 4;
 
+// Turret LED's
+const int turretBarrelLed = 34;
+
 // Motor control pins and PWM channels
 const int motorLeftPin1 = 13;  // INT1 on the L298N for left motor
 const int motorLeftPin2 = 15;  // INT2 on the L298N for left motor
@@ -41,6 +44,7 @@ const int udpPort = 4210; // UDP port to listen on
 void setupWiFi() {
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
+    digitalWrite(statusBarLed1, !digitalRead(statusBarLed1));
     delay(500);
     Serial.print(".");
   }
@@ -102,14 +106,6 @@ void setup() {
 
   pinMode(ledPin, OUTPUT);
 
-  setupWiFi();
-  setupOTA();
-  setupUDP();
-
-  Serial.println("Ready");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-
   // Initialize status bar LEDs
   pinMode(statusBarLed1, OUTPUT);
   pinMode(statusBarLed2, OUTPUT);
@@ -119,6 +115,10 @@ void setup() {
   digitalWrite(statusBarLed1, HIGH);
   digitalWrite(statusBarLed2, HIGH);
   digitalWrite(statusBarLed3, HIGH);
+
+  // initialize turret barrel LED
+  pinMode(turretBarrelLed, OUTPUT);
+  digitalWrite(turretBarrelLed, LOW);
 
   // Initialize motor control pins as outputs
   pinMode(motorLeftPin1, OUTPUT);
@@ -151,6 +151,17 @@ void setup() {
   ledcWrite(pwmChannelRight2, 0);
   ledcWrite(pwmChannelTurret1, 0);
   ledcWrite(pwmChannelTurret2, 0);
+
+  setupWiFi();
+  setupOTA();
+  setupUDP();
+
+  Serial.println("Ready");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  // setup done, turn on status bar LED 2
+  digitalWrite(statusBarLed2, LOW);
 }
 
 void stop() {
@@ -216,6 +227,12 @@ void handleUDP() {
       return;
     }
 
+    if (data[0] == 'F') {
+      digitalWrite(statusBarLed3, !digitalRead(statusBarLed3));
+      digitalWrite(turretBarrelLed, !digitalRead(turretBarrelLed));
+      return;
+    }
+
     int commaIndex = data.indexOf(',');
     int leftSpeed = 0;
     int rightSpeed = 0;
@@ -256,16 +273,23 @@ void handleBlink() {
       lastBlinkTime = currentTime;
       digitalWrite(ledPin, !digitalRead(ledPin));
 
-      // Toggle status bar LEDs
-      digitalWrite(statusBarLed1, !digitalRead(statusBarLed1));
+      // Toggle status bar LEDs 2 and 3
       digitalWrite(statusBarLed2, !digitalRead(statusBarLed2));
       digitalWrite(statusBarLed3, !digitalRead(statusBarLed3));
     }
   } else {
     digitalWrite(ledPin, LOW);
-    digitalWrite(statusBarLed1, HIGH);
-    digitalWrite(statusBarLed2, HIGH);
-    digitalWrite(statusBarLed3, HIGH);
+  }
+}
+
+void handleWifiStatusLED() {
+  // blink status bar LED 1 when no WiFi, turn on when connected
+  if (WiFi.status() != WL_CONNECTED) {
+    if (millis() % 1000 < 500) {
+      digitalWrite(statusBarLed1, !digitalRead(statusBarLed1));
+    }
+  } else {
+    digitalWrite(statusBarLed1, LOW);
   }
 }
 
@@ -273,4 +297,5 @@ void loop() {
   ArduinoOTA.handle();
   handleUDP();
   handleBlink();
+  handleWifiStatusLED();
 }
